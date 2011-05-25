@@ -108,7 +108,7 @@ using namespace std;
 	if (showSign)
 		formatString = [@"%m\01" stringByAppendingString:formatString];
 	
-	NSMutableArray *arguments = [NSMutableArray arrayWithObjects:@"log", @"-z", @"--topo-order", @"--children", formatString, nil];
+	NSMutableArray *arguments = [NSMutableArray arrayWithObjects:@"log", @"-z", @"--date-order", @"--children", formatString, nil];
 
 	if (!rev)
 		[arguments addObject:@"HEAD"];
