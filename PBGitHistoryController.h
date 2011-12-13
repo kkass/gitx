@@ -1,5 +1,5 @@
 //
-//  PBGitHistoryView.h
+//  PBGitHistoryController.h
 //  GitX
 //
 //  Created by Pieter de Bie on 19-09-08.
@@ -22,6 +22,7 @@
 
 @class PBHistorySearchController;
 
+// Controls the split history view from PBGitHistoryView.xib
 @interface PBGitHistoryController : PBViewController PROTOCOL_10_6(NSOutlineViewDelegate){
 	IBOutlet PBRefController *refController;
 	IBOutlet NSSearchField *searchField;
@@ -33,7 +34,7 @@
 	IBOutlet PBCommitList* commitList;
 	IBOutlet NSSplitView *historySplitView;
 	IBOutlet PBWebHistoryController *webHistoryController;
-    QLPreviewPanel* previewPanel;
+	QLPreviewPanel* previewPanel;
 	IBOutlet PBHistorySearchController *searchController;
 	IBOutlet GLFileView *fileView;
 

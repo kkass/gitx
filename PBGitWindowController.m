@@ -16,6 +16,11 @@
 #import "PBGitXMessageSheet.h"
 #import "PBGitSidebarController.h"
 
+#ifndef MAC_OS_X_VERSION_10_7
+#define NSApplicationPresentationAutoHideToolbar 0
+#define NSApplicationPresentationFullScreen 0
+#endif
+
 @implementation PBGitWindowController
 
 
@@ -41,7 +46,10 @@
 	if (contentController)
 		[contentController removeObserver:self forKeyPath:@"status"];
 }
-
+- (NSApplicationPresentationOptions)window:(NSWindow *)window willUseFullScreenPresentationOptions:(NSApplicationPresentationOptions)proposedOptions
+{
+    return NSApplicationPresentationAutoHideToolbar | NSApplicationPresentationFullScreen | NSApplicationPresentationAutoHideMenuBar | NSApplicationPresentationAutoHideDock;
+}
 - (BOOL)validateMenuItem:(NSMenuItem *)menuItem
 {
 	if ([menuItem action] == @selector(showCommitView:)) {
@@ -50,8 +58,14 @@
 	} else if ([menuItem action] == @selector(showHistoryView:)) {
 		[menuItem setState:(contentController != sidebarController.commitViewController) ? YES : NO];
 		return ![repository isBareRepository];
-	}
+	} else if ([menuItem action] == @selector(commit:)){
+        return [contentController isKindOfClass:[PBGitCommitController class]]; 
+    }
 	return YES;
+}
+- (IBAction) commit:(id) sender
+{
+    [(PBGitCommitController *)contentController commit:sender];
 }
 
 - (void) awakeFromNib
@@ -232,6 +246,18 @@
 	}
     
 	[super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
+}
+
+- (void) selectCommitForSha:(NSString *)sha
+{
+	if (contentController != sidebarController.historyViewController)
+		[sidebarController selectCurrentBranch];
+	[sidebarController.historyViewController selectCommit:sha];
+}
+
+- (NSArray *) menuItemsForPaths:(NSArray *)paths
+{
+	return [sidebarController.historyViewController menuItemsForPaths:paths];
 }
 
 - (void)setHistorySearch:(NSString *)searchString mode:(NSInteger)mode

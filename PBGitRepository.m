@@ -12,14 +12,17 @@
 #import "PBGitBinary.h"
 
 #import "NSFileHandleExt.h"
-#import "PBEasyPipe.h"
-#import "PBGitRef.h"
-#import "PBGitRevSpecifier.h"
-#import "PBRemoteProgressSheet.h"
-#import "PBGitRevList.h"
-#import "PBGitDefaults.h"
 #import "GitXScriptingConstants.h"
+#import "PBEasyPipe.h"
+#import "PBGitDefaults.h"
+#import "PBGitRef.h"
+#import "PBGitResetController.h"
+#import "PBGitRevList.h"
+#import "PBGitRevSpecifier.h"
 #import "PBHistorySearchController.h"
+#import "PBRemoteProgressSheet.h"
+#import "PBStashController.h"
+#import "PBSubmoduleController.h"
 
 #import "PBGitStash.h"
 #import "PBGitSubmodule.h"
@@ -29,6 +32,18 @@ NSString* PBGitRepositoryErrorDomain = @"GitXErrorDomain";
 @interface PBGitRepository()
 @end
 
+dispatch_queue_t PBGetWorkQueue() {
+#if 1
+	static dispatch_queue_t work_queue;
+	static dispatch_once_t onceToken;
+	dispatch_once(&onceToken, ^{
+		work_queue = dispatch_queue_create("PBWorkQueue", 0);
+	});
+	return work_queue;
+#else
+	return dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_BACKGROUND, 0);
+#endif
+}
 
 
 @implementation PBGitRepository
@@ -247,11 +262,13 @@ NSString* PBGitRepositoryErrorDomain = @"GitXErrorDomain";
 
 - (BOOL)isBareRepository
 {
-	if([self workingDirectory]) {
-		return [PBGitRepository isBareRepository:[self workingDirectory]];
-	} else {
-		return true;
+	if(!didCheckBareRepository) {
+		if([self workingDirectory])
+			bareRepository = [PBGitRepository isBareRepository:[self workingDirectory]];
+		else
+			bareRepository = YES;
 	}
+	return bareRepository;
 }
 
 // Overridden to create our custom window controller
@@ -355,11 +372,16 @@ NSString* PBGitRepositoryErrorDomain = @"GitXErrorDomain";
 
 		PBGitRef *newRef = [PBGitRef refFromString:[components objectAtIndex:0]];
 		PBGitRevSpecifier *revSpec = [[PBGitRevSpecifier alloc] initWithRef:newRef];
-
-		[revSpec setHelpText:[self helpTextForRef:newRef]];
 		[self addBranch:revSpec];
 		[self addRef:newRef fromParameters:components];
 		[oldBranches removeObject:revSpec];
+
+		dispatch_async(PBGetWorkQueue(), ^{
+			NSString* helpText = [self helpTextForRef:newRef];
+			dispatch_async(dispatch_get_main_queue(), ^{
+				[revSpec setHelpText:helpText];
+			});
+		});
 	}
 
 	for (PBGitRevSpecifier *branch in oldBranches)
@@ -464,7 +486,31 @@ NSString* PBGitRepositoryErrorDomain = @"GitXErrorDomain";
 		if ([[commit sha] isEqual:sha])
 			return commit;
 
-	return nil;
+	// The commit has not been loaded, but it may exist anyway
+	NSArray *args = [NSArray arrayWithObjects:
+			@"show", sha,
+			@"--pretty=format:"
+					"%P%n"         // parents
+					"%aN <%aE>%n"  // author name
+					"%cN <%cE>%n"  // committer name
+					"%ct%n"        // commit date
+					"%s",          // subject
+			nil];
+	int retValue = 1;
+	NSString *output = [self outputInWorkdirForArguments:args retValue:&retValue];
+
+	if ((retValue != 0) || [output hasPrefix:@"fatal:"])
+		return nil;
+
+	NSArray *lines = [output componentsSeparatedByString:@"\n"];
+	PBGitCommit *commit = [PBGitCommit commitWithRepository:self andSha:sha];
+	
+	commit.parents = [[lines objectAtIndex:0] componentsSeparatedByString:@" "];
+	commit.author = [lines objectAtIndex:1];
+	commit.committer = [lines objectAtIndex:2];
+	commit.timestamp = [[lines objectAtIndex:3] intValue];
+	commit.subject = [lines objectAtIndex:4];
+	return commit;
 }
 
 - (BOOL)isOnSameBranch:(NSString *)branchSHA asSHA:(NSString *)testSHA
@@ -601,12 +647,14 @@ NSString* PBGitRepositoryErrorDomain = @"GitXErrorDomain";
 
 - (NSString *) workingDirectory
 {
-	if ([self.fileURL.path hasSuffix:@"/.git"])
-		return [self.fileURL.path substringToIndex:[self.fileURL.path length] - 5];
-	else if ([[self outputForCommand:@"rev-parse --is-inside-work-tree"] isEqualToString:@"true"])
-		return [PBGitBinary path];
+	if(!workingDirectory) {
+		if ([self.fileURL.path hasSuffix:@"/.git"])
+			workingDirectory = [[self.fileURL.path substringToIndex:[self.fileURL.path length] - 5] retain];
+		else if ([[self outputForCommand:@"rev-parse --is-inside-work-tree"] isEqualToString:@"true"])
+			workingDirectory = [PBGitBinary path];
+	}
 	
-	return nil;
+	return workingDirectory;
 }
 
 #pragma mark Remotes

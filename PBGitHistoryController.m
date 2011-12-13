@@ -1,5 +1,5 @@
 //
-//  PBGitHistoryView.m
+//  PBGitHistoryController.m
 //  GitX
 //
 //  Created by Pieter de Bie on 19-09-08.
@@ -94,7 +94,7 @@
     
 
 	[super awakeFromNib];
-    [fileBrowser setDelegate:self];
+	[fileBrowser setDelegate:self];
 }
 
 - (void)updateKeys
@@ -414,7 +414,7 @@
 
 - (void) updateView
 {
-    [self refresh: nil];
+	[self refresh: nil];
 	[self updateKeys];
 }
 

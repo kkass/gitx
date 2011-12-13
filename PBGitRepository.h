@@ -12,10 +12,6 @@
 #import "PBGitConfig.h"
 #import "PBGitRefish.h"
 
-#import "PBStashController.h"
-#import "PBGitResetController.h"
-#import "PBSubmoduleController.h"
-
 extern NSString* PBGitRepositoryErrorDomain;
 typedef enum branchFilterTypes {
 	kGitXAllBranchesFilter = 0,
@@ -42,7 +38,11 @@ static NSString * PBStringFromBranchFilterType(PBGitXBranchFilterType type) {
 
 @class PBGitWindowController;
 @class PBGitCommit;
-@class NSString;
+@class PBGitResetController;
+@class PBStashController;
+@class PBSubmoduleController;
+
+dispatch_queue_t PBGetWorkQueue();
 
 @interface PBGitRepository : NSDocument {
 	PBGitHistoryList* revisionList;
@@ -60,6 +60,10 @@ static NSString * PBStringFromBranchFilterType(PBGitXBranchFilterType type) {
 	PBStashController *stashController;
 	PBSubmoduleController *submoduleController;
 	PBGitResetController *resetController;
+
+	BOOL didCheckBareRepository;
+	BOOL bareRepository;
+	NSString* workingDirectory;
 }
 @property (nonatomic, retain, readonly) PBStashController *stashController;
 @property (nonatomic, retain, readonly) PBSubmoduleController *submoduleController;
